@@ -19,7 +19,7 @@ namespace AzureFunctions
         private static HttpClient client = new HttpClient();
         
         [FunctionName("Add2Sql")]
-        public static void Run([IoTHubTrigger("messages/events", Connection = "IotHub", ConsumerGroup = "iothub")]EventData data, ILogger log)
+        public static void Run([IoTHubTrigger("messages/events", Connection = "IotHub", ConsumerGroup = "sa")]EventData data, ILogger log)
         {
             log.LogInformation($"IoT Hub function processed a message: {Encoding.UTF8.GetString(data.Body.Array)}");
 
@@ -52,21 +52,21 @@ namespace AzureFunctions
                     var geoLocationId = long.Parse(cmd.ExecuteScalar().ToString());
 
                     /* Devices */
-                    cmd.CommandText = "IF NOT EXISTS (SELECT DeviceName FROM Devices WHERE DeviceName = @DeviceName) INSERT INTO Devices OUTPUT inserted.DeviceName VALUES(@DeviceName, @DeviceTypeId, @GeoLocationId, @ModelId) ELSE SELECT DeviceName FROM Devices WHERE DeviceName = @DeviceName";
+                    cmd.CommandText = "IF NOT EXISTS (SELECT DeviceName FROM Devices WHERE DeviceName = @DeviceName) INSERT INTO Devices OUTPUT inserted.DeviceName VALUES(@DeviceName, @DeviceTypeId, @ModelId) ELSE SELECT DeviceName FROM Devices WHERE DeviceName = @DeviceName";
                     cmd.Parameters.AddWithValue("@DeviceName", data.Properties["DeviceName"].ToString());
                     cmd.Parameters.AddWithValue("@DeviceTypeId", deviceTypeId);
-                    cmd.Parameters.AddWithValue("@GeoLocationId", geoLocationId);
                     cmd.Parameters.AddWithValue("@ModelId", modelId);
                     var deviceName = cmd.ExecuteScalar().ToString();
 
                     /* DhtMeasurements */
-                    cmd.CommandText = "IF NOT EXISTS (SELECT 1 FROM TimeTable WHERE UnixUtcTime = @MeasureUnixTime) INSERT INTO TimeTable OUTPUT inserted.UnixUtcTime VALUES (@MeasureUnixTime) ELSE SELECT UnixUtcTime FROM TimeTable WHERE UnixUtcTime = @MeasureUnixTime INSERT INTO DhtMeasurements VALUES(@DeviceId, @MeasureUnixTime, @Temperature, @Humidity, @TemperatureAlert)";
+                    cmd.CommandText = "IF NOT EXISTS (SELECT 1 FROM TimeTable WHERE UnixUtcTime = @MeasureUnixTime) INSERT INTO TimeTable OUTPUT inserted.UnixUtcTime VALUES (@MeasureUnixTime) ELSE SELECT UnixUtcTime FROM TimeTable WHERE UnixUtcTime = @MeasureUnixTime INSERT INTO DhtMeasurements VALUES(@DeviceId, @MeasureUnixTime, @GeoLocationId, @Temperature, @Humidity, @TemperatureAlert)";
                     DhtMeasurement dhtdata = JsonConvert.DeserializeObject<DhtMeasurement>(Encoding.UTF8.GetString(data.Body.Array));
                     cmd.Parameters.AddWithValue("@MeasureUnixTime", dhtdata.EpochTime);
                     cmd.Parameters.AddWithValue("@Temperature", dhtdata.Temperature);
                     cmd.Parameters.AddWithValue("@Humidity", dhtdata.Humidity);
                     cmd.Parameters.AddWithValue("@DeviceId", deviceTypeId);
-                    cmd.Parameters.AddWithValue("@TemperatureAlert", int.Parse(dhtdata.TemperatureAlert));
+                    cmd.Parameters.AddWithValue("@GeoLocationId", geoLocationId);
+                    cmd.Parameters.AddWithValue("@TemperatureAlert", dhtdata.TemperatureAlert);
                     cmd.ExecuteNonQuery();
 
                 }
